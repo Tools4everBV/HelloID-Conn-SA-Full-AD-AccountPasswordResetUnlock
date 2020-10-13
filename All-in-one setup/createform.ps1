@@ -483,7 +483,7 @@ try {
             name = "$delegatedFormName";
             dynamicFormGUID = "$formGuid";
             isEnabled = "True";
-            accessGroups = @("$delegatedFormAccessGroupGuid");
+            accessGroups = $delegatedFormAccessGroupGuids;
             useFaIcon = "True";
             faIcon = "fa fa-key";
         }  
