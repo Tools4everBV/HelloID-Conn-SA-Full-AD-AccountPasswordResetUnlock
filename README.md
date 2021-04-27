@@ -44,3 +44,6 @@ This Powershell data source runs an Active Directory query to select a list of b
 
 ### Delegated form task 'AD-user-reset-unlock'
 This delegated form task will reset the password of the selected user account and also unlock the account itself. Both actions are optional and can be configured from the Dynamic form.
+
+# HelloID Docs
+The official HelloID documentation can be found at: https://docs.helloid.com/
