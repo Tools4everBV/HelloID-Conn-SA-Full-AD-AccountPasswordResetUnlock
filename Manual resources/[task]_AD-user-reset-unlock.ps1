@@ -10,8 +10,9 @@ try {
 if($blnreset -eq 'true'){
     try {
     	Set-ADAccountPassword -Identity $adUser -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $password -Force)
-    	HID-Write-Status -Message "Password reset: $userPrincipalName" -Event Success
-    	HID-Write-Summary -Message "Password reset: $userPrincipalName" -Event Success
+    	Set-ADUser -Identity $adUser -ChangePasswordAtLogon ([System.Convert]::ToBoolean($blnchangenextlogon))
+    	HID-Write-Status -Message "Password reset: $userPrincipalName .Change at next logon: $blnchangenextlogon" -Event Success
+    	HID-Write-Summary -Message "Password reset: $userPrincipalName .Change at next logon: $blnchangenextlogon" -Event Success
     } catch {
         HID-Write-Status -Message "Could not reset password [$userPrincipalName]. Error: $($_.Exception.Message)" -Event Error
         HID-Write-Summary -Message "Failed to reset pasword [$userPrincipalName]" -Event Failed
