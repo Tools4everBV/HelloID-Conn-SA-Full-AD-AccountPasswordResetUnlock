@@ -14,5 +14,9 @@
     {
         "name":  "userPrincipalName",
         "value":  "{{form.gridUsers.UserPrincipalName}}"
+    },
+    {
+        "name":  "blnchangenextlogon",
+        "value":  "{{form.blnchangenextlogon}}"
     }
 ]
