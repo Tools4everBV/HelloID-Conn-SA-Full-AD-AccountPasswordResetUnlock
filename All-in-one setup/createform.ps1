@@ -1,3 +1,6 @@
+# Set TLS to accept TLS, TLS 1.1 and TLS 1.2
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+
 #HelloID variables
 $script:PortalBaseUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
