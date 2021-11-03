@@ -5,6 +5,13 @@ This HelloID Service Automation Delegated Form provides AD user accout password 
  2. Show basic AD user account attributes of selected target user
  3. Enter a new password and unlock the AD user account (optional)
 
+
+## Versioning
+| Version | Description | Date |
+| - | - | - |
+| 1.0.1   | Added version number and updated all-in-one script | 2021/11/03  |
+| 1.0.0   | Initial release | 2020/09/01  |
+
  
 <!-- TABLE OF CONTENTS -->
 ## Table of Contents
@@ -13,6 +20,7 @@ This HelloID Service Automation Delegated Form provides AD user accout password 
   * [Getting started](#getting-started)
 * [Post-setup configuration](#post-setup-configuration)
 * [Manual resources](#manual-resources)
+* [Getting help](#getting-help)
 
 
 ## All-in-one PowerShell setup script
@@ -45,5 +53,8 @@ This Powershell data source runs an Active Directory query to select a list of b
 ### Delegated form task 'AD-user-reset-unlock'
 This delegated form task will reset the password of the selected user account and also unlock the account itself. Both actions are optional and can be configured from the Dynamic form.
 
-# HelloID Docs
+## Getting help
+_If you need help, feel free to ask questions on our [forum](https://forum.helloid.com/forum/helloid-connectors/service-automation/504-helloid-sa-active-directory-ad-account-password-reset-and-unlock)_
+
+## HelloID Docs
 The official HelloID documentation can be found at: https://docs.helloid.com/
