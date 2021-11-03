@@ -1,5 +1,9 @@
 [
     {
+        "name":  "blnchangenextlogon",
+        "value":  "{{form.blnchangenextlogon}}"
+    },
+    {
         "name":  "blnreset",
         "value":  "{{form.blnreset}}"
     },
@@ -14,9 +18,5 @@
     {
         "name":  "userPrincipalName",
         "value":  "{{form.gridUsers.UserPrincipalName}}"
-    },
-    {
-        "name":  "blnchangenextlogon",
-        "value":  "{{form.blnchangenextlogon}}"
     }
 ]
