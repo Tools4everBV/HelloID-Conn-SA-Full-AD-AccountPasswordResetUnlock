@@ -21,7 +21,7 @@ $tmpName = @'
 ADusersSearchOU
 '@ 
 $tmpValue = @'
-[{ "OU": "OU=Disabled Users,OU=HelloID Training,DC=veeken,DC=local"},{ "OU": "OU=Users,OU=HelloID Training,DC=veeken,DC=local"},{"OU": "OU=External,OU=HelloID Training,DC=veeken,DC=local"}]
+[{ "OU": "OU=Users,OU=enyoi,DC=enyoi,DC=local"},{ "OU": "OU=UsersLite,OU=enyoi,DC=enyoi,DC=local"}]
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
@@ -88,7 +88,7 @@ function Invoke-HelloIDGlobalVariable {
                 secret   = $Secret;
                 ItemType = 0;
             }    
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl + "api/v1/automation/variable")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -134,7 +134,7 @@ function Invoke-HelloIDAutomationTask {
                 objectGuid          = $ObjectGuid;
                 variables           = (ConvertFrom-Json-WithEmptyArray($Variables));
             }
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl +"api/v1/automationtasks/powershell")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -189,7 +189,7 @@ function Invoke-HelloIDDatasource {
                 script             = $DatasourcePsScript;
                 input              = (ConvertFrom-Json-WithEmptyArray($DatasourceInput));
             }
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
       
             $uri = ($script:PortalBaseUrl +"api/v1/datasource")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -258,6 +258,7 @@ function Invoke-HelloIDDelegatedForm {
         [parameter()][String][AllowEmptyString()]$Categories,
         [parameter(Mandatory)][String]$UseFaIcon,
         [parameter()][String][AllowEmptyString()]$FaIcon,
+        [parameter()][String][AllowEmptyString()]$task,
         [parameter(Mandatory)][Ref]$returnObject
     )
     $delegatedFormCreated = $false
@@ -280,8 +281,9 @@ function Invoke-HelloIDDelegatedForm {
                 accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
                 useFaIcon       = $UseFaIcon;
                 faIcon          = $FaIcon;
+                task            = ConvertFrom-Json -inputObject $task;
             }    
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -306,6 +308,8 @@ function Invoke-HelloIDDelegatedForm {
     $returnObject.value.guid = $delegatedFormGuid
     $returnObject.value.created = $delegatedFormCreated
 }
+
+
 <# Begin: HelloID Global Variables #>
 foreach ($item in $globalHelloIDVariables) {
 	Invoke-HelloIDGlobalVariable -Name $item.name -Value $item.value -Secret $item.secret 
@@ -347,23 +351,23 @@ AD-user-generate-table-attributes-basic-reset-password
 Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_1) 
 <# End: DataSource "AD-user-generate-table-attributes-basic-reset-password" #>
 
-<# Begin: DataSource "AD-user-generate-table-wildcard-reset-password" #>
+<# Begin: DataSource "AD-user-generate-table-wildcard-reset-password-ict" #>
 $tmpPsScript = @'
 try {
-    $searchValue = $dataSource.searchUser
-    $searchQuery = "*$searchValue*"
+    $searchValue = $dataSource.searchValue
+    $searchQuery = '*'+$dataSource.searchValue+'*'
     $searchOUs = $ADusersSearchOU
+    #$searchDepartment = '*'+$dataSource.searchDepartment+'*'
      
      
-    if([String]::IsNullOrEmpty($searchValue) -eq $true){
-        return
-    }else{
+
         Write-Information "SearchQuery: $searchQuery"
+         Write-Information "SearchDepartment: $searchDepartment"
         Write-Information "SearchBase: $searchOUs"
          
         $ous = $searchOUs | ConvertFrom-Json
         $users = foreach($item in $ous) {
-            Get-ADUser -Filter {Name -like $searchQuery -or DisplayName -like $searchQuery -or userPrincipalName -like $searchQuery -or mail -like $searchQuery} -SearchBase $item.ou -properties SamAccountName, displayName, UserPrincipalName, Description, company, Department, Title
+            Get-ADUser -Filter { (Name -like $searchQuery -or DisplayName -like $searchQuery -or userPrincipalName -like $searchQuery -or mail -like $searchQuery)} -SearchBase $item.ou -properties SamAccountName, displayName, UserPrincipalName, Description, company, Department, Title
         }
          
         $users = $users | Sort-Object -Property DisplayName
@@ -376,34 +380,34 @@ try {
                 Write-Output $returnObject
             }
         }
-    }
+    
 } catch {
     $msg = "Error searching AD user [$searchValue]. Error: $($_.Exception.Message)"
     Write-Error $msg
 }
 '@ 
 $tmpModel = @'
-[{"key":"Description","type":0},{"key":"SamAccountName","type":0},{"key":"Title","type":0},{"key":"Company","type":0},{"key":"Department","type":0},{"key":"displayName","type":0},{"key":"UserPrincipalName","type":0}]
+[{"key":"SamAccountName","type":0},{"key":"displayName","type":0},{"key":"Title","type":0},{"key":"Description","type":0},{"key":"UserPrincipalName","type":0},{"key":"Company","type":0},{"key":"Department","type":0}]
 '@ 
 $tmpInput = @'
-[{"description":null,"translateDescription":false,"inputFieldType":1,"key":"searchUser","type":0,"options":1}]
+[{"description":"searchValue","translateDescription":false,"inputFieldType":1,"key":"searchValue","type":0,"options":1}]
 '@ 
 $dataSourceGuid_0 = [PSCustomObject]@{} 
 $dataSourceGuid_0_Name = @'
-AD-user-generate-table-wildcard-reset-password
+AD-user-generate-table-wildcard-reset-password-ict
 '@ 
 Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_0) 
-<# End: DataSource "AD-user-generate-table-wildcard-reset-password" #>
+<# End: DataSource "AD-user-generate-table-wildcard-reset-password-ict" #>
 <# End: HelloID Data sources #>
 
-<# Begin: Dynamic Form "AD Account - Reset password & Unlock" #>
+<# Begin: Dynamic Form "AD Account - Reset password & Unlock ICT" #>
 $tmpSchema = @"
-[{"label":"Select user account","fields":[{"key":"searchfield","templateOptions":{"label":"Search","placeholder":"Username or email address"},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true},{"key":"gridUsers","templateOptions":{"label":"Select user","required":true,"grid":{"columns":[{"headerName":"DisplayName","field":"displayName"},{"headerName":"UserPrincipalName","field":"UserPrincipalName"},{"headerName":"Department","field":"Department"},{"headerName":"Title","field":"Title"},{"headerName":"Description","field":"Description"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchUser","otherFieldValue":{"otherFieldKey":"searchfield"}}]}},"useFilter":false},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true}]},{"label":"Reset password","fields":[{"key":"gridDetails","templateOptions":{"label":"Basic attributes","required":false,"grid":{"columns":[{"headerName":"Name","field":"name"},{"headerName":"Value","field":"value"}],"height":350,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"selectedUser","otherFieldValue":{"otherFieldKey":"gridUsers"}}]}},"useFilter":false},"type":"grid","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true},{"key":"blnreset","templateOptions":{"label":"Reset password","useSwitch":true,"checkboxLabel":" "},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true},{"key":"password","templateOptions":{"label":"New password"},"hideExpression":"!model[\"blnreset\"]","type":"passwordconfirm","summaryVisibility":"Hide value","requiresTemplateOptions":true,"requiresKey":true},{"key":"blnchangenextlogon","templateOptions":{"label":"Change password at next logon","useSwitch":true,"checkboxLabel":""},"hideExpression":"!model[\"blnreset\"]","type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true},{"key":"blnunlock","templateOptions":{"label":"Unlock account","useSwitch":true,"checkboxLabel":""},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true}]}]
+[{"label":"Select user account","fields":[{"key":"searchValue","templateOptions":{"label":"Search","placeholder":"Username or email address","required":true,"minLength":2},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridUsers","templateOptions":{"label":"select user","required":true,"grid":{"columns":[{"headerName":"Sam Account Name","field":"SamAccountName"},{"headerName":"Display Name","field":"displayName"},{"headerName":"Title","field":"Title"},{"headerName":"Description","field":"Description"},{"headerName":"User Principal Name","field":"UserPrincipalName"},{"headerName":"Company","field":"Company"},{"headerName":"Department","field":"Department"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchValue","otherFieldValue":{"otherFieldKey":"searchValue"}}]}},"useFilter":true,"useDefault":false},"hideExpression":"!model[\"searchValue\"]","type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"Reset password","fields":[{"key":"gridDetails","templateOptions":{"label":"Basic attributes","required":false,"grid":{"columns":[{"headerName":"Name","field":"name"},{"headerName":"Value","field":"value"}],"height":350,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"selectedUser","otherFieldValue":{"otherFieldKey":"gridUsers"}}]}},"useFilter":false},"type":"grid","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true},{"key":"blnreset","templateOptions":{"label":"Reset password","useSwitch":true,"checkboxLabel":" "},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"password","templateOptions":{"label":"New password"},"hideExpression":"!model[\"blnreset\"]","type":"passwordconfirm","summaryVisibility":"Hide value","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnchangenextlogon","templateOptions":{"label":"Change password at next logon","useSwitch":true,"checkboxLabel":""},"hideExpression":"!model[\"blnreset\"]","type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnunlock","templateOptions":{"label":"Unlock account","useSwitch":true,"checkboxLabel":""},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
 "@ 
 
 $dynamicFormGuid = [PSCustomObject]@{} 
 $dynamicFormName = @'
-AD Account - Reset password & Unlock
+AD Account - Reset password & Unlock ICT
 '@ 
 Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -returnObject ([Ref]$dynamicFormGuid) 
 <# END: Dynamic Form #>
@@ -422,7 +426,7 @@ foreach($group in $delegatedFormAccessGroupNames) {
         Write-Error "HelloID (access)group '$group', message: $_"
     }
 }
-$delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Compress)
+$delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Depth 100 -Compress)
 
 $delegatedFormCategoryGuids = @()
 foreach($category in $delegatedFormCategories) {
@@ -438,7 +442,7 @@ foreach($category in $delegatedFormCategories) {
         $body = @{
             name = @{"en" = $category};
         }
-        $body = ConvertTo-Json -InputObject $body
+        $body = ConvertTo-Json -InputObject $body -Depth 100
 
         $uri = ($script:PortalBaseUrl +"api/v1/delegatedformcategories")
         $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -448,63 +452,18 @@ foreach($category in $delegatedFormCategories) {
         Write-Information "HelloID Delegated Form category '$category' successfully created$(if ($script:debugLogging -eq $true) { ": " + $tmpGuid })"
     }
 }
-$delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategoryGuids -Compress)
+$delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategoryGuids -Depth 100 -Compress)
 <# End: Delegated Form Access Groups and Categories #>
 
 <# Begin: Delegated Form #>
 $delegatedFormRef = [PSCustomObject]@{guid = $null; created = $null} 
 $delegatedFormName = @'
-AD Account - Reset password & Unlock
+AD Account - Reset password & Unlock ICT
 '@
-Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-key" -returnObject ([Ref]$delegatedFormRef) 
-<# End: Delegated Form #>
-
-<# Begin: Delegated Form Task #>
-if($delegatedFormRef.created -eq $true) { 
-	$tmpScript = @'
-try {
-    $adUser = Get-ADuser -Filter { UserPrincipalName -eq $userPrincipalName }
-    HID-Write-Status -Message "Found AD user [$userPrincipalName]" -Event Information
-    HID-Write-Summary -Message "Found AD user [$userPrincipalName]" -Event Information
-} catch {
-    HID-Write-Status -Message "Could not find AD user [$userPrincipalName]. Error: $($_.Exception.Message)" -Event Error
-    HID-Write-Summary -Message "Failed to find AD user [$userPrincipalName]" -Event Failed
-}
-
-if($blnreset -eq 'true'){
-    try {
-    	Set-ADAccountPassword -Identity $adUser -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $password -Force)
-    	Set-ADUser -Identity $adUser -ChangePasswordAtLogon ([System.Convert]::ToBoolean($blnchangenextlogon))
-    	HID-Write-Status -Message "Password reset: $userPrincipalName .Change at next logon: $blnchangenextlogon" -Event Success
-    	HID-Write-Summary -Message "Password reset: $userPrincipalName .Change at next logon: $blnchangenextlogon" -Event Success
-    } catch {
-        HID-Write-Status -Message "Could not reset password [$userPrincipalName]. Error: $($_.Exception.Message)" -Event Error
-        HID-Write-Summary -Message "Failed to reset pasword [$userPrincipalName]" -Event Failed
-    }
-}
-
-if($blnunlock -eq 'true'){
-    try {
-	    Unlock-ADAccount -Identity $adUser
-	    HID-Write-Status -Message "Unlock account: $userPrincipalName" -Event Success
-	    HID-Write-Summary -Message "Unlock account: $userPrincipalName" -Event Success
-    } catch {
-        HID-Write-Status -Message "Could not unlock [$userPrincipalName]. Error: $($_.Exception.Message)" -Event Error
-        HID-Write-Summary -Message "Failed to unlock [$userPrincipalName]" -Event Failed
-    }
-}
-'@; 
-
-	$tmpVariables = @'
-[{"name":"blnchangenextlogon","value":"{{form.blnchangenextlogon}}","secret":false,"typeConstraint":"string"},{"name":"blnreset","value":"{{form.blnreset}}","secret":false,"typeConstraint":"string"},{"name":"blnunlock","value":"{{form.blnunlock}}","secret":false,"typeConstraint":"string"},{"name":"password","value":"{{form.password}}","secret":false,"typeConstraint":"string"},{"name":"userPrincipalName","value":"{{form.gridUsers.UserPrincipalName}}","secret":false,"typeConstraint":"string"}]
+$tmpTask = @'
+{"name":"AD Account - Reset password & Unlock ICT","script":"$VerbosePreference = \"SilentlyContinue\"\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\n# variables configured in form\r\n$userPrincipalName = $form.gridUsers.UserPrincipalName\r\n$blnreset = [System.Convert]::ToBoolean($form.blnreset)\r\n$password = $form.password\r\n$changePasswordAtLogon = [System.Convert]::ToBoolean($form.blnchangenextlogon)\r\n$blnunlock = [System.Convert]::ToBoolean($form.blnunlock)\r\n\r\nif ($blnreset -eq $true) {\r\n    try {\r\n        $adUser = Get-ADuser -Filter { UserPrincipalName -eq $userPrincipalName }\r\n        Write-Verbose \"Found AD acount: $($userPrincipalName)\"\r\n\r\n        $resetPasswordADUser = Set-ADAccountPassword -Identity $adUser -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $password -Force)\r\n        $updateADUser = Set-ADUser -Identity $adUser -ChangePasswordAtLogon $changePasswordAtLogon\r\n        Write-Information \"Successfully reset password of AD account: $($userPrincipalName). Change at next logon: $($changePasswordAtLogon)\"\r\n\r\n        $adUserSID = $([string]$adUser.SID)\r\n        $adUserdisplayName = $([string]$adUser.DisplayName)\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully reset password of AD account: $($userPrincipalName). Change at next logon: $($changePasswordAtLogon)\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $adUserdisplayName # optional (free format text) \r\n            TargetIdentifier  = $adUserSID # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        Write-Error \"Could not reset password of AD account: $($userPrincipalName). Change at next logon: $($changePasswordAtLogon). Error: $($_)\"\r\n    \r\n        $adUserSID = $([string]$adUser.SID)\r\n        $adUserdisplayName = $([string]$adUser.DisplayName)   \r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Failed to reset password of AD account: $($userPrincipalName). Change at next logon: $($changePasswordAtLogon). Error: $($_.Exception.Message)\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $adUserdisplayName # optional (free format text)\r\n            TargetIdentifier  = $adUserSID # optional (free format text)\r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n}\r\n\r\nif ($blnunlock -eq $true) {\r\n    try {\r\n        $adUser = Get-ADuser -Filter { UserPrincipalName -eq $userPrincipalName }\r\n        Write-Verbose \"Found AD account: $($userPrincipalName)\"\r\n\r\n        $unlockADUser = Unlock-ADAccount -Identity $adUser\r\n        Write-Information \"Successfully unlocked AD account: $($userPrincipalName)\"\r\n\r\n        $adUserSID = $([string]$adUser.SID)\r\n        $adUserdisplayName = $([string]$adUser.DisplayName)\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully unlocked AD account: $($userPrincipalName)\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $adUserdisplayName # optional (free format text) \r\n            TargetIdentifier  = $adUserSID # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        Write-Error \"Could not unlock AD account: $($userPrincipalName). Error: $($_)\"\r\n\r\n        $adUserSID = $([string]$adUser.SID)\r\n        $adUserdisplayName = $([string]$adUser.DisplayName)   \r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Failed to unlock AD account: $($userPrincipalName). Error: $($_.Exception.Message)\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $adUserdisplayName # optional (free format text)\r\n            TargetIdentifier  = $adUserSID # optional (free format text)\r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n}","runInCloud":false}
 '@ 
 
-	$delegatedFormTaskGuid = [PSCustomObject]@{} 
-$delegatedFormTaskName = @'
-AD-user-reset-unlock
-'@
-	Invoke-HelloIDAutomationTask -TaskName $delegatedFormTaskName -UseTemplate "False" -AutomationContainer "8" -Variables $tmpVariables -PowershellScript $tmpScript -ObjectGuid $delegatedFormRef.guid -ForceCreateTask $true -returnObject ([Ref]$delegatedFormTaskGuid) 
-} else {
-	Write-Warning "Delegated form '$delegatedFormName' already exists. Nothing to do with the Delegated Form task..." 
-}
-<# End: Delegated Form Task #>
+Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-key" -task $tmpTask -returnObject ([Ref]$delegatedFormRef) 
+<# End: Delegated Form #>
+
