@@ -1,7 +1,7 @@
 # HelloID-Conn-SA-Full-AD-AccountPasswordResetUnlock
 
-| :information_source: Information |
-| :------------------------------- |
+| :information_source: Information                                                                                                                                                                                                                                                                                                                                                          |
+| :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | This repository contains the connector and configuration code only. The implementer is responsible for acquiring the connection details such as username, password, certificate, etc. You might even need to sign a contract or agreement with the supplier before implementing this connector. Please contact the client's application manager to coordinate the connector requirements. |
 
 ## Description
@@ -11,7 +11,7 @@ By using this delegated form, you can manage Active Directory user account passw
 1. Search for and select the target Active Directory (AD) user account.
 2. Option to reset the password and/or unlock the selected AD user account.
    >  A random password will be generated, but the user has the option to change it if needed.
-   
+
    >  The generated password will be validated against a regular expression (RegEx) to ensure it meets security requirements.
 3. Option to require the user to change their password at the next logon.
 4. Option to unlock the account.
@@ -23,16 +23,16 @@ By using this delegated form, you can manage Active Directory user account passw
   The connector requires access to an Active Directory domain with sufficient permissions to reset user passwords and unlock user accounts. A service account with appropriate AD permissions is necessary.
 - **HelloID Agent**:<br>
   A HelloID Agent must be installed and configured to communicate with the Active Directory domain.
-- **PowerShell Support**:<br>
+- **PowerShell module 'ActiveDirectory'**:<br>
   The HelloID Agent must have PowerShell available with Active Directory module support.
 
 ### Connection settings
 
 The following user-defined variables are used by the connector.
 
-| Setting  | Description                        | Mandatory |
-| -------- | ---------------------------------- | --------- |
-| ADusersSearchOU | Array of Active Directory OUs for scoping AD user accounts in the search result of this form | Yes |
+| Setting         | Description                                                                                  | Mandatory |
+| --------------- | -------------------------------------------------------------------------------------------- | --------- |
+| ADusersSearchOU | Array of Active Directory OUs for scoping AD user accounts in the search result of this form | Yes       |
 
 ## Remarks
  
@@ -56,12 +56,12 @@ This connector uses the **ActiveDirectory** PowerShell module for managing Activ
 ### Cmdlets
 The following PowerShell cmdlets are used by the connector:
  
-| Cmdlet | Description |
-| ------ | ----------- |
-| Get-ADUser | Retrieves Active Directory user accounts |
-| Set-ADAccountPassword | Resets the password for an Active Directory account |
-| Set-ADUser | Modifies properties of an Active Directory user |
-| Unlock-ADAccount | Unlocks an Active Directory account that has been locked out |
+| Cmdlet                | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| Get-ADUser            | Retrieves Active Directory user accounts                     |
+| Set-ADAccountPassword | Resets the password for an Active Directory account          |
+| Set-ADUser            | Modifies properties of an Active Directory user              |
+| Unlock-ADAccount      | Unlocks an Active Directory account that has been locked out |
  
 ### Cmdlet documentation
 - [Get-ADUser](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser)
