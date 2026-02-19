@@ -7,7 +7,7 @@ $portalUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
 $apiSecret = "API_SECRET"
 $delegatedFormAccessGroupNames = @("") #Only unique names are supported. Groups must exist!
-$delegatedFormCategories = @("Active Directory","User Management") #Only unique names are supported. Categories will be created if not exists
+$delegatedFormCategories = @("User Management","Active Directory") #Only unique names are supported. Categories will be created if not exists
 $script:debugLogging = $false #Default value: $false. If $true, the HelloID resource GUIDs will be shown in the logging
 $script:duplicateForm = $false #Default value: $false. If $true, the HelloID resource names will be changed to import a duplicate Form
 $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID resource names to generate a duplicate form with different resource names
@@ -21,7 +21,7 @@ $tmpName = @'
 ADusersSearchOU
 '@ 
 $tmpValue = @'
-OU=Users,OU=JVO-HelloID-Training,DC=tools4ever,DC=local
+DC=zeeman,DC=com
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
@@ -516,26 +516,32 @@ ad-account-reset-password-unlock | Generate-Random-Password
 Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -DataSourceRunInCloud "False" -returnObject ([Ref]$dataSourceGuid_1) 
 <# End: DataSource "ad-account-reset-password-unlock | Generate-Random-Password" #>
 
-<# Begin: DataSource "ad-account-reset-password-unlock | AD-Get-All-Users" #>
+<# Begin: DataSource "ad-account-reset-password-unlock | AD-Get-All-Users-Wildcard-Name-DisplayName-UPN-Mail" #>
 $tmpPsScript = @'
 # Variables configured in form
-$searchValue = $dataSource.searchUser
-$searchQuery = "*$searchValue*"
-$filter = "Name -like '$searchQuery' -or DisplayName -like '$searchQuery' -or userPrincipalName -like '$searchQuery' -or mail -like '$searchQuery'"
+$searchValue = $dataSource.searchValue
+if ($searchValue -eq "*") {
+    $filter = "Name -like '*'"
+}
+else {
+    $filter = "Name -like '*$searchValue*' -or DisplayName -like '*$searchValue*' -or userPrincipalName -like '*$searchValue*' -or mail -like '*$searchValue*'"
+}
 
 # Global variables
 $searchOUs = $AdUsersSearchOu
 
 # Fixed values
-$propertiesToSelect = @(                    
+$propertiesToSelect = @(
+    "ObjectGuid",
     "SamAccountName",
     "DisplayName",
     "UserPrincipalName",
+    "Enabled",
+    "LockedOut",
     "Description", 
     "Company",
     "Department",
-    "Title",
-    "ObjectGuid"
+    "Title"
 ) # Properties to select from Microsoft AD, comma separated
 
 # Set debug logging
@@ -545,37 +551,35 @@ $WarningPreference = "Continue"
 
 try {
     #region Searching user
-    $actionMessage = "searching AD account(s) with the value entered [$($searchValue)]"
+    $actionMessage = "querying AD account(s) matching the filter [$filter] in OU(s) [$($searchOUs)]"
 
-    if ([String]::IsNullOrEmpty($searchValue) -eq $true) {
-        return
-    }
-    else {
-        Write-Information "SearchQuery: $searchQuery"
-        Write-Information "SearchBase: $searchOUs"
-         
-        $ous = $searchOUs -split ';'
-        $users = foreach ($item in $ous) {
-            $getAdUsersSplatParams = @{
-                Filter      = $filter
-                Searchbase  = $item
-                Properties  = $propertiesToSelect
-                Verbose     = $False
-                ErrorAction = "Stop"
-            }
-            Get-AdUser @getAdUsersSplatParams | Select-Object -Property $propertiesToSelect
+    $ous = $searchOUs -split ';'
+    $adUsers = [System.Collections.ArrayList]@()
+    foreach ($ou in $ous) {
+        $actionMessage = "querying AD account(s) matching the filter [$filter] in OU [$($ou)]"
+        $getAdUsersSplatParams = @{
+            Filter      = $filter
+            Searchbase  = $ou
+            Properties  = $propertiesToSelect
+            Verbose     = $False
+            ErrorAction = "Stop"
         }
-         
-        $users = $users | Sort-Object -Property DisplayName
-        $resultCount = @($users).Count
-        Write-Information "Result count: $resultCount"
-         
-        if ($resultCount -gt 0) {
-            foreach ($user in $users) {
-                Write-Output $user
-            }
+        $getAdUsersResponse = Get-AdUser @getAdUsersSplatParams | Select-Object -Property $propertiesToSelect
+
+        if ($getAdUsersResponse -is [array]) {
+            [void]$adUsers.AddRange($getAdUsersResponse)
+        }
+        else {
+            [void]$adUsers.Add($getAdUsersResponse)
         }
     }
+    Write-Information "Queried AD account(s) matching the filter [$filter] in OU(s) [$($searchOUs)]. Result count: $(($adUsers | Measure-Object).Count)"
+
+    # Sort and Send results to HelloID
+    $actionMessage = "sending results to HelloID"
+    $adUsers | ForEach-Object {
+        Write-Output $_
+    } 
 }
 catch {
     $ex = $PSItem
@@ -585,22 +589,22 @@ catch {
 }
 '@ 
 $tmpModel = @'
-[{"key":"SamAccountName","type":0},{"key":"DisplayName","type":0},{"key":"UserPrincipalName","type":0},{"key":"Description","type":0},{"key":"Company","type":0},{"key":"Department","type":0},{"key":"Title","type":0},{"key":"ObjectGuid","type":0}]
+[{"key":"ObjectGuid","type":0},{"key":"SamAccountName","type":0},{"key":"DisplayName","type":0},{"key":"UserPrincipalName","type":0},{"key":"Enabled","type":0},{"key":"LockedOut","type":0},{"key":"Description","type":0},{"key":"Company","type":0},{"key":"Department","type":0},{"key":"Title","type":0}]
 '@ 
 $tmpInput = @'
-[{"description":"searchUser","translateDescription":false,"inputFieldType":1,"key":"searchUser","type":0,"options":1}]
+[{"description":"","translateDescription":false,"inputFieldType":1,"key":"searchValue","type":0,"options":1}]
 '@ 
 $dataSourceGuid_0 = [PSCustomObject]@{} 
 $dataSourceGuid_0_Name = @'
-ad-account-reset-password-unlock | AD-Get-All-Users
+ad-account-reset-password-unlock | AD-Get-All-Users-Wildcard-Name-DisplayName-UPN-Mail
 '@ 
 Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -DataSourceRunInCloud "False" -returnObject ([Ref]$dataSourceGuid_0) 
-<# End: DataSource "ad-account-reset-password-unlock | AD-Get-All-Users" #>
+<# End: DataSource "ad-account-reset-password-unlock | AD-Get-All-Users-Wildcard-Name-DisplayName-UPN-Mail" #>
 <# End: HelloID Data sources #>
 
 <# Begin: Dynamic Form "AD Account - Reset password & Unlock" #>
 $tmpSchema = @"
-[{"label":"Select user account","fields":[{"key":"searchValue","templateOptions":{"label":"Search","placeholder":"Username or email address","required":true,"minLength":2},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridUsers","templateOptions":{"label":"select user","required":true,"grid":{"columns":[{"headerName":"DisplayName","field":"DisplayName"},{"headerName":"UserPrincipalName","field":"UserPrincipalName"},{"headerName":"Department","field":"Department"},{"headerName":"Title","field":"Title"},{"headerName":"Description","field":"Description"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchUser","otherFieldValue":{"otherFieldKey":"searchValue"}}]}},"useFilter":true,"useDefault":false,"allowCsvDownload":true},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"Reset password","fields":[{"key":"blnreset","templateOptions":{"label":"Reset password","useSwitch":true,"checkboxLabel":" "},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"Password","templateOptions":{"label":"New Password","readonly":false,"useDataSource":true,"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[]}},"displayField":"password","required":true,"pattern":"^(?=.*[ABCDEFGHJKMNPQRSTUVWXYZ])(?=.*[abcdefghjkmnpqrstuvwxyz])(?=.*[23456789])(?=.*[!#$@*?])[ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!#$@*?]{12,}$"},"validation":{"messages":{"pattern":"Password validation failed.\n\nRequirements:\n- Minimum length: 12 characters.\n- At least one uppercase letter from: ABCDEFGHJKMNPQRSTUVWXYZ (excludes I, L, O).\n- At least one lowercase letter from: abcdefghjkmnpqrstuvwxyz (excludes i, l, o).\n- At least one digit from: 2 3 4 5 6 7 8 9 (excludes 0 and 1).\n- At least one special character from: ! # $ @ * ?"}},"hideExpression":"!model[\"blnreset\"]","type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnchangenextlogon","templateOptions":{"label":"Change password at next logon","useSwitch":true,"checkboxLabel":""},"hideExpression":"!model[\"blnreset\"]","type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnunlock","templateOptions":{"label":"Unlock account","useSwitch":true,"checkboxLabel":""},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
+[{"label":"Select user account","fields":[{"key":"searchValue","templateOptions":{"label":"Search (wildcard search in Name, Display name, UserPrincipalName and Mail)","placeholder":"Name, Display name, UserPrincipalName or Mail (use * to search all users)","required":true,"minLength":2},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridUsers","templateOptions":{"label":"select user","required":true,"grid":{"columns":[{"headerName":"DisplayName","field":"DisplayName"},{"headerName":"UserPrincipalName","field":"UserPrincipalName"},{"headerName":"Enabled","field":"Enabled"},{"headerName":"LockedOut","field":"LockedOut"},{"headerName":"Department","field":"Department"},{"headerName":"Title","field":"Title"},{"headerName":"Description","field":"Description"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchValue","otherFieldValue":{"otherFieldKey":"searchValue"}}]}},"useFilter":true,"useDefault":false,"allowCsvDownload":true},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"Reset password","fields":[{"key":"blnreset","templateOptions":{"label":"Reset password","useSwitch":true,"checkboxLabel":" "},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"Password","templateOptions":{"label":"New Password","readonly":false,"useDataSource":true,"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[]}},"displayField":"password","required":true,"pattern":"^(?=.*[ABCDEFGHJKMNPQRSTUVWXYZ])(?=.*[abcdefghjkmnpqrstuvwxyz])(?=.*[23456789])(?=.*[!#$@*?])[ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!#$@*?]{12,}$"},"validation":{"messages":{"pattern":"Password validation failed.\n\nRequirements:\n- Minimum length: 12 characters.\n- At least one uppercase letter from: ABCDEFGHJKMNPQRSTUVWXYZ (excludes I, L, O).\n- At least one lowercase letter from: abcdefghjkmnpqrstuvwxyz (excludes i, l, o).\n- At least one digit from: 2 3 4 5 6 7 8 9 (excludes 0 and 1).\n- At least one special character from: ! # $ @ * ?"}},"hideExpression":"!model[\"blnreset\"]","type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnchangenextlogon","templateOptions":{"label":"Change password at next logon","useSwitch":true,"checkboxLabel":""},"hideExpression":"!model[\"blnreset\"]","type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"blnunlock","templateOptions":{"label":"Unlock account","useSwitch":true,"checkboxLabel":""},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
 "@ 
 
 $dynamicFormGuid = [PSCustomObject]@{} 
@@ -665,7 +669,7 @@ $delegatedFormName = @'
 AD Account - Reset password & Unlock
 '@
 $tmpTask = @'
-{"name":"AD Account - Reset password \u0026 Unlock","script":"# variables configured in form\r\n$user = $form.gridUsers\r\n$blnreset = [System.Convert]::ToBoolean($form.blnreset)\r\n$password = $form.password\r\n$blnchangePasswordAtLogon = [System.Convert]::ToBoolean($form.blnchangenextlogon)\r\n$blnunlock = [System.Convert]::ToBoolean($form.blnunlock)\r\n\r\n# Set debug logging\r\n$VerbosePreference = \"SilentlyContinue\"\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\nif ($blnreset -eq $true) {\r\n    try {\r\n        $actionMessage = \"resetting AD account password for user [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        Set-ADAccountPassword -Identity $user.ObjectGuid -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $password -Force)\r\n        Write-Information \"Successfully reset password of AD account: [$($user.userPrincipalName)].\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully reset password of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n    \r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Failed to reset password of AD account: [$($user.userPrincipalName)]. Error: $($_.Exception.Message)\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n    }\r\n}\r\n\r\nif ($blnchangePasswordAtLogon -eq $true) {\r\n    try {\r\n        $actionMessage = \"changing attribute ChangePasswordAtNextLogon for user [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        Set-ADUser -Identity $user.ObjectGuid -ChangePasswordAtLogon $blnchangePasswordAtLogon\r\n        Write-Information \"Successfully changed attribute ChangePasswordAtNextLogon of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully changed attribute ChangePasswordAtNextLogon of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Failed to change attribute ChangePasswordAtNextLogon of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]. Error: $($_.Exception.Message)\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n    }\r\n}\r\n\r\nif ($blnunlock -eq $true) {\r\n    try {\r\n\r\n        Unlock-ADAccount -Identity $user.ObjectGuid\r\n        Write-Information \"Successfully unlocked AD account: [$($user.userPrincipalName)]\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully unlocked AD account: [$($user.userPrincipalName)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Failed to unlock AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]. Error: $($_.Exception.Message)\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n    }\r\n}","runInCloud":false}
+{"name":"AD Account - Reset password & Unlock","script":"# variables configured in form\r\n$user = $form.gridUsers\r\n$blnreset = [System.Convert]::ToBoolean($form.blnreset)\r\n$password = $form.password\r\n$blnchangePasswordAtLogon = [System.Convert]::ToBoolean($form.blnchangenextlogon)\r\n$blnunlock = [System.Convert]::ToBoolean($form.blnunlock)\r\n\r\n# Set debug logging\r\n$VerbosePreference = \"SilentlyContinue\"\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\nif ($blnreset -eq $true) {\r\n    try {\r\n        $actionMessage = \"resetting AD account password for user [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        Set-ADAccountPassword -Identity $user.ObjectGuid -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $password -Force)\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully reset password of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n    \r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = $auditMessage # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n        # exit # use when using multiple try/catch and the script must stop\r\n    }\r\n}\r\n\r\nif ($blnchangePasswordAtLogon -eq $true) {\r\n    try {\r\n        $actionMessage = \"setting attribute ChangePasswordAtNextLogon to [$blnchangePasswordAtLogon] for user [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        Set-ADUser -Identity $user.ObjectGuid -ChangePasswordAtLogon $blnchangePasswordAtLogon\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully set attribute ChangePasswordAtNextLogon to [$blnchangePasswordAtLogon] of AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = $auditMessage # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        } \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n    }\r\n}\r\n\r\nif ($blnunlock -eq $true) {\r\n    try {\r\n        $actionMessage = \"unlocking AD user [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\"\r\n\r\n        Unlock-ADAccount -Identity $user.ObjectGuid\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = \"Successfully unlocked AD account: [$($user.userPrincipalName)] with objectguid [$($user.ObjectGuid)]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        #send result back\r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        $ex = $PSItem\r\n        $auditMessage = \"Error $($actionMessage). Error: $($ex.Exception.Message)\"\r\n        $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n\r\n        $Log = @{\r\n            Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n            System            = \"ActiveDirectory\" # optional (free format text) \r\n            Message           = $auditMessage # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $user.userPrincipalName # optional (free format text) \r\n            TargetIdentifier  = $user.ObjectGuid # optional (free format text) \r\n        }\r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n        Write-Warning $warningMessage   \r\n        Write-Error $auditMessage\r\n    }\r\n}","runInCloud":false}
 '@ 
 
 Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-key" -task $tmpTask -returnObject ([Ref]$delegatedFormRef) 
