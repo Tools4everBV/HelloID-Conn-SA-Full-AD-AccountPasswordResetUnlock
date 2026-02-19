@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file. The format 
 - **BREAKING**: Replaced manual password entry with auto-generated password data source
 - **BREAKING**: Changed ADusersSearchOU variable format from JSON array to semicolon-delimited string
   - Old format: `[{ "OU": "OU=Users,OU=enyoi,DC=enyoi,DC=local"},{ "OU": "OU=UsersLite,OU=enyoi,DC=enyoi,DC=local"}]`
-  - New format: `OU=Users,OU=enyoi,DC=enyoi,DC=local`
+  - New format: `OU=Users,OU=enyoi,DC=enyoi,DC=local;OU=UsersLite,OU=enyoi,DC=enyoi,DC=local`
 - Updated form schema with improved grid columns and better user experience
 - Refactored task script to use ObjectGuid for account identification instead of relying solely on UserPrincipalName
 - Improved task error handling with separate try-catch blocks for each operation (reset, change password at logon, unlock)
