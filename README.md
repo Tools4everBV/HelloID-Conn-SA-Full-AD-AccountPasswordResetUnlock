@@ -9,10 +9,12 @@ _HelloID-Conn-SA-Full-AD-AccountPasswordResetUnlock_ is a delegated form designe
 
 By using this delegated form, you can manage Active Directory user account passwords and account lock status. The following options are available:
 1. Search for and select the target Active Directory (AD) user account.
-2. Reset the password and/or unlock the selected AD user account.
-3. A random password will be generated, but the user has the option to change it if needed.
-4. The generated password will be validated against a regular expression (RegEx) to ensure it meets security requirements.
-5. The password can be reset, and the option to require the user to change their password at the next logon can be enabled, along with unlocking the account if necessary.
+2. Option to reset the password and/or unlock the selected AD user account.
+   >  A random password will be generated, but the user has the option to change it if needed.
+   
+   >  The generated password will be validated against a regular expression (RegEx) to ensure it meets security requirements.
+3. Option to require the user to change their password at the next logon.
+4. Option to unlock the account.
 
 ## Getting started
 ### Requirements
