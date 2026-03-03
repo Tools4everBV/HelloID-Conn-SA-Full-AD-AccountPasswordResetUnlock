@@ -8,7 +8,7 @@
           "label": "Search (wildcard search in Name, Display name, UserPrincipalName and Mail)",
           "placeholder": "Name, Display name, UserPrincipalName or Mail (use * to search all users)",
           "required": true,
-          "minLength": 2
+          "minLength": 1
         },
         "type": "input",
         "summaryVisibility": "Hide element",
